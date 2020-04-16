@@ -1,11 +1,11 @@
 // show start btn and hide new round btn
-document.getElementById("start-btn").style.display = "initial";
-document.getElementById("stop-btn").style.display = "none";
-// for test only
-// document.getElementById("new-round-btn").style.display = "none";
-document.getElementById("visualize-data").style.display = "none";
+$("#start-btn").show();
+$("#stop-btn").hide();
+$("#new-round-btn").hide();
+$("#visualize-data").hide();
 
-var choiceImgList = ["bao.jpg", "zin.jpg", "dap.jpg"];
+let choiceImgList = ["bao.jpg", "zin.jpg", "dap.jpg"];
+let message = document.querySelector("#new-round-btn");
 
 
 // More API functions here:
@@ -15,7 +15,7 @@ var choiceImgList = ["bao.jpg", "zin.jpg", "dap.jpg"];
 const URL = "../my-model/";
 
 let model, webcam, labelContainer, maxPredictions;
-var globalID;
+let updateWebcam;
 
 
 // Load the image model and setup the webcam
@@ -35,37 +35,40 @@ async function init() {
     webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
     await webcam.setup(); // request access to the webcam
     await webcam.play();
-    globalID = window.requestAnimationFrame(loop);
+    window.requestAnimationFrame(loop);
 
     // append elements to the DOM
+    document.getElementById("webcam-container").innerHTML = "";
     document.getElementById("webcam-container").appendChild(webcam.canvas);
     labelContainer = document.getElementById("label-container");
     for (let i = 0; i < maxPredictions; i++) { // and class labels
         labelContainer.appendChild(document.createElement("div"));
     }
-    document.getElementById("start-btn").style.display = "none";
-    document.getElementById("stop-btn").style.display = "initial";
-    document.getElementById("new-round-btn").style.display = "initial";
-    document.getElementById("visualize-data").style.display = "initial";
+    $("#start-btn").hide();
+    $("#stop-btn").show();
+    $("#new-round-btn").show();
+    $("#visualize-data").show();
+    message.removeAttribute("disabled");
 
 }
 
 async function loop() {
-  webcam.update(); // update the webcam frame
-  await predict();
-  globalID = window.requestAnimationFrame(loop);
+  updateWebcam = setInterval(async function() {
+    await webcam.update(); // update the webcam frame
+    await predict();
+  }, 1000/10);
 }
 
 // run the webcam image through the image model
 async function predict() {
     // predict can take in an image, video or canvas html element
     const prediction = await model.predict(webcam.canvas);
-    var barPercentage = "";
+    let barPercentage = "";
 
     for (let i = 0; i < maxPredictions; i++) {
-        const classPrediction =
-            prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-        labelContainer.childNodes[i].innerHTML = classPrediction;
+        // const classPrediction =
+        //     prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        // labelContainer.childNodes[i].innerHTML = classPrediction;
         barPercentage = Math.round(prediction[i].probability.toFixed(2)*100) + "%";
         document.querySelectorAll(".vis-bar")[i].style.width = barPercentage;
         document.querySelectorAll(".vis-bar")[i].innerText = barPercentage;
@@ -74,23 +77,21 @@ async function predict() {
 
 function stopWebcam() {
   webcam.stop();
-  cancelAnimationFrame(globalID);
+  clearInterval(updateWebcam);
+  $("#start-btn").show();
+  $("#stop-btn").hide();
+  message.disabled = "true";
 
-  document.getElementById("start-btn").style.display = "initial";
-  document.getElementById("stop-btn").style.display = "none";
-  document.getElementById("visualize-data").style.display = "none";
-  document.getElementById("webcam-container").innerHTML = "";
 }
 
 function newround() {
-  var message = document.getElementById("new-round-btn");
   message.classList.remove("btn-primary");
   message.classList.add("btn-secondary");
   message.innerText = "Are you ready?";
 
   // set a timer with 3 seconds
-  var timeleft = 1; //countdown seconds
-  var countdown = setInterval(function(){
+  let timeleft = 3; //countdown seconds
+  let countdown = setInterval(function(){
     if(timeleft <= 0){
       clearInterval(countdown);
       comparison();
@@ -98,35 +99,38 @@ function newround() {
       message.innerText = timeleft;
     }
     timeleft -= 1;
-  }, 1000);
+  }, 700);
 }
 
 function comMakeChoice() {
-  var comChoice = Math.floor(Math.random() * 3);
-  var comImg = choiceImgList[comChoice];
+  let comChoice = Math.floor(Math.random() * 3);
+  let comImg = choiceImgList[comChoice];
+  console.log("comChoice = " + comChoice);
+  console.log("comImg = " + comImg);
   document.getElementById("com-img").src = "./images/" + comImg;
   return comChoice;
 }
 
-async function humanMakeChoie() {
-  webcam.stop();
-  cancelAnimationFrame(globalID);
+async function humanMakeChoice() {
+  
   const predictions = await model.predict(webcam.canvas);
-  var mostProbable = Math.max(predictions[0].probability, predictions[1].probability, predictions[2].probability);
+  let mostProbable = Math.max(predictions[0].probability, predictions[1].probability, predictions[2].probability);
   function findThatChoice(prediction) {
     return prediction.probability == mostProbable;
   }
-  return predictions.findIndex(findThatChoice);
+  let humanChoice = predictions.findIndex(findThatChoice);
+  stopWebcam();
+  return humanChoice;
 }
 
 
 
-function comparison() {
-  var comChoice = comMakeChoice();
-  // var humanChoice = humanMakeChoie();
-  var humanChoice = comMakeChoice();
-  var name = ["bao", "zin", "dap"];
-  var result = "e"; // default result is error
+async function comparison() {
+  let comChoice = comMakeChoice();
+  let humanChoice = await humanMakeChoice();
+  console.log("com" + comChoice);
+  console.log("human" + humanChoice);
+  let result = "e"; // default result is error
   if ((comChoice + 1)%3 == humanChoice) result = "h";
   if ((humanChoice + 1)%3 == comChoice) result = "c";
   if (comChoice == humanChoice) result = "d";
@@ -136,6 +140,29 @@ function comparison() {
 
 function displayResult(r) {
   console.log(r);
+  switch (r) {
+    case 'h':
+      message.innerText = "You win!";
+      confetti();
+      break;
+    case 'c':  
+      message.innerText = "Computer wins!";
+      break;
+    case 'd':
+      message.innerText = "Draw!";
+      break;
+    default:
+      message.innerText = "Default message";
+  }
+
+  let resetGame = setInterval(function(){
+    init();
+    message.innerText = "Another Round!";
+    message.classList.add("btn-primary");
+    message.classList.remove("btn-secondary");
+    message.removeAttribute("disabled");
+    clearInterval(resetGame);
+  }, 4000);
 }
 
 
