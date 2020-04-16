@@ -12,7 +12,7 @@ let message = document.querySelector("#new-round-btn");
 // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
 
 // the link to your model provided by Teachable Machine export panel
-const URL = "../my-model/";
+const URL = "./my-model/";
 
 let model, webcam, labelContainer, maxPredictions;
 let updateWebcam;
